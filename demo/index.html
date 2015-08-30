@@ -17,6 +17,25 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     <link rel="import" href="../search-component.html">
   </head>
   <body>
-    <search-component></search-component>
+    <template id="wrapperTemplate" is="dom-bind">
+      <search-component
+              input-placeholder="Wikipedia search"
+              get-remote-suggestions='[[searchWikipedia]]'>
+      </search-component>
+    </template>
   </body>
+
+  <script>
+    document.querySelector('#wrapperTemplate').searchWikipedia = function searchWikipedia(term) {
+      return $.ajax({
+        url: 'http://en.wikipedia.org/w/api.php',
+        dataType: 'jsonp',
+        data: {
+          action: 'opensearch',
+          format: 'json',
+          search: term
+        }
+      }).promise();
+    };
+  </script>
 </html>

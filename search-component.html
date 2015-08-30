@@ -1,4 +1,12 @@
 <link rel="import" href="../polymer/polymer.html">
+<link rel="import" href="../paper-input/paper-input.html">
+<link rel="import" href="../iron-collapse/iron-collapse.html">
+<link rel="import" href="../paper-item/all-imports.html">
+<link rel="import" href="../paper-button/paper-button.html">
+<link rel="import" href="../paper-material/paper-material.html">
+
+<script src="../jquery/dist/jquery.js"></script>
+<script src="../rxjs/dist/rx.lite.js"></script>
 
 <!--
 An element for searching.
@@ -9,11 +17,98 @@ Example:
 
 @demo
 -->
-<script>
-    Polymer({
-        is: 'search-component',
-        properties: {},
+<dom-module id="search-component">
+    <template>
+        <paper-input type="text"
+               id="searchInput"
+               value="{{searchTerm::input}}"
+               label="[[inputPlaceholder]]"
+               autofocus>
+        </paper-input>
+        <iron-collapse id="collapse">
+            <paper-material>
+                <div class="collapse-content">
+                    <template id="resultList" is="dom-repeat" items="{{searchResults}}">
+                        <paper-item>
+                            <paper-button on-tap="_chooseItem" value="{{item}}">{{item}}</paper-button>
+                        </paper-item>
+                    </template>
+                </div>
+            </paper-material>
+        </iron-collapse>
+    </template>
 
-        ready: function() {},
-    });
-</script>
+    <script>
+        Polymer({
+            is: 'search-component',
+            properties: {
+                /**
+                 * `inputPlaceholder` indicates the placeholder of search input
+                 */
+                inputPlaceholder: {
+                    type: String,
+                    value: "Default placeholder text"
+                },
+                /**
+                 * `searchResults` are the results of searching
+                 */
+                searchResults: {
+                    type: Array,
+                    value: [],
+                    observer: "_resultsChanged"
+                },
+                /**
+                 * `timeout` is time in ms after which search request will be send to server
+                 */
+                timeout: {
+                    type: Number,
+                    value: 500
+                },
+                /**
+                 * `minLength` minimal length of input value needed to make request to server
+                 */
+                minLength: {
+                    type: Number,
+                    value: 2
+                },
+                /**
+                 * `getRemoteSuggestions` function returning promise. Here you should specify ajax call to server. This
+                 * function should take search term as parameter
+                 */
+                getRemoteSuggestions: {
+                    type: Object
+                }
+            },
+            _resultsChanged: function(results) {
+                var collapse = this.$.collapse;
+                if (results.length > 0 && !collapse.opened) {
+                    this.$.resultList.render();
+                    collapse.toggle()
+                } else if (results.length == 0 && collapse.opened) {
+                    collapse.toggle()
+                }
+            },
+            _chooseItem: function(event, sender) {
+                var clickedButtonValue = event.path[1].value;
+                this.set('searchTerm', clickedButtonValue);
+                this.$.collapse.toggle();
+            },
+
+            ready: function() {
+                var self = this;
+                var observable = Rx.Observable.fromEvent(this.$.searchInput, 'keyup');
+                var subscription = observable.map(function (e) {
+                    return e.target.value;
+                }).filter(function (inputText) { return inputText.length > self.minLength || inputText.length == 0;})
+                        .debounce(self.timeout)
+                        .distinctUntilChanged()
+                        .flatMapLatest(self.getRemoteSuggestions)
+                        .subscribe(function(e) {
+                            self.set('searchResults', e[1]);
+                        });
+            }
+        });
+    </script>
+
+
+</dom-module>
